@@ -220,7 +220,7 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = db.Get(&comment_count_raw, query, params...)
+	err = db.Select(&comment_count_raw, query, params...)
 	if err != nil {
 		return nil, err
 	}

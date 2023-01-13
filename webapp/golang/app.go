@@ -1013,7 +1013,7 @@ func layoutTemplate(Me User, content string) string {
 			  <h1><a href="/">Iscogram</a></h1>
 			</div>
 			<div class="isu-header-menu">`
-	if Me.ID ==0 {
+	if Me.ID == 0 {
 		res += `<div><a href="/login">ログイン</a></div>`
 	} else {
 		res += `<div><a href="/@{{.Me.AccountName}}"><span class="isu-account-name">{{.Me.AccountName}}</span>さん</a></div>`
@@ -1032,12 +1032,12 @@ func layoutTemplate(Me User, content string) string {
 		<script src="/js/main.js"></script>
 	  </body>
 	</html>`
-	return res	
+	return res
 }
 func indexTemplate(
-	Posts     []Post,
+	Posts []Post,
 	CSRFToken string,
-	Flash     string) string {
+	Flash string) string {
 	res := ""
 	res += `
 	<div class="isu-submit">
@@ -1049,17 +1049,17 @@ func indexTemplate(
 		  <textarea name="body"></textarea>
 		</div>
 		<div class="form-submit">
-		  <input type="hidden" name="csrf_token" value="`+CSRFToken+`">
+		  <input type="hidden" name="csrf_token" value="` + CSRFToken + `">
 		  <input type="submit" name="submit" value="submit">
 		</div>`
 	if Flash != "" {
-		res += `<div id="notice-message" class="alert alert-danger">`+
-			Flash+
+		res += `<div id="notice-message" class="alert alert-danger">` +
+			Flash +
 			`</div>`
 	}
 	res += `</form>
 	</div>`
-	
+
 	res += postsTemplate(Posts, CSRFToken)
 	res += `<div id="isu-post-more">
 	  <button id="isu-post-more-btn">もっと見る</button>
@@ -1070,9 +1070,9 @@ func indexTemplate(
 func postsTemplate(ps []Post, CSRFToken string) string {
 	res := ""
 	for _, p := range ps {
-		res += `<div class="isu-posts">`+postTemplate(p,CSRFToken)+
-	  `</div>`
-	  
+		res += `<div class="isu-posts">` + postTemplate(p, CSRFToken) +
+			`</div>`
+
 	}
 	return res
 }
@@ -1109,8 +1109,8 @@ func postTemplate(p Post, CSRFToken string) string {
     <div class="isu-comment-form">
       <form method="post" action="/comment">
         <input type="text" name="comment">
-        <input type="hidden" name="post_id" value="`+strconv.Itoa(p.ID)`">
-        <input type="hidden" name="csrf_token" value="`+CSRFToken+`">
+        <input type="hidden" name="post_id" value="` + strconv.Itoa(p.ID) + `">
+        <input type="hidden" name="csrf_token" value="` + CSRFToken + `">
         <input type="submit" name="submit" value="submit">
       </form>
     </div>

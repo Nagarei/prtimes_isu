@@ -184,7 +184,7 @@ deploy-service-file:
 
 .PHONY: deploy-envsh
 deploy-envsh:
-	cp $(WORKDIR)/$(SERVER_ID)/home/isucon/$(ENV_FILE) $(WORKDIR)/$(ENV_FILE)
+	cp $(WORKDIR)/$(SERVER_ID)/$(ENV_FILE) $(WORKDIR)/$(ENV_FILE)
 
 .PHONY: build
 build:

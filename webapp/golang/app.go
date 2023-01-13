@@ -1081,7 +1081,7 @@ func postTemplate(p Post, CSRFToken string) string {
 	res := ""
 	res += `<div class="isu-post" id="pid_` + strconv.Itoa(p.ID) + `" data-created-at="` + p.CreatedAt.Format("2006-01-02T15:04:05-07:00") + `">
   <div class="isu-post-header">
-    <a href="/@` + p.User.AccountName + ` " class="isu-post-account-name">` + p.User.AccountName + `</a>
+    <a href="/@` + p.User.AccountName + `" class="isu-post-account-name">` + p.User.AccountName + `</a>
     <a href="/posts/` + strconv.Itoa(p.ID) + `" class="isu-post-permalink">
       <time class="timeago" datetime="` + p.CreatedAt.Format("2006-01-02T15:04:05-07:00") + `"></time>
     </a>

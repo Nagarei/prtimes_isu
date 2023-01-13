@@ -55,7 +55,7 @@ type Post struct {
 	CreatedAt    time.Time `db:"created_at"`
 	CommentCount int
 	Comments     []Comment
-	User         User
+	User         User `db:"u"`
 	CSRFToken    string
 }
 
@@ -211,11 +211,30 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 		}
 	}
 
+	type CommentCount struct {
+		Count  int `db:"count"`
+		PostID int `db:"post_id"`
+	}
+	var comment_count_raw []CommentCount
+	query, params, err = sqlx.In("SELECT post_id, COUNT(*) AS `count` FROM `comments` WHERE `post_id` IN (?) GROUP BY `post_id`", postIDs)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = db.Get(&comment_count_raw, query, params...)
+	if err != nil {
+		return nil, err
+	}
+	comment_count_dict := map[int]int{}
+	for _, c := range comment_count_raw {
+		comment_count_dict[c.PostID] = c.Count
+	}
+
 	for _, p := range results {
-		err = db.Get(&p.CommentCount, "SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?", p.ID)
-		if err != nil {
-			return nil, err
-		}
+		// err = db.Get(&p.CommentCount, "SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?", p.ID)
+		// if err != nil {
+		// 	return nil, err
+		// }
+		p.CommentCount = comment_count_dict[p.ID]
 
 		var comments []Comment = comments_dict[p.ID]
 
@@ -226,9 +245,11 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 
 		p.Comments = comments
 
-		err = db.Get(&p.User, "SELECT * FROM `users` WHERE `id` = ?", p.UserID)
-		if err != nil {
-			return nil, err
+		if p.User.ID == 0 {
+			err = db.Get(&p.User, "SELECT * FROM `users` WHERE `id` = ?", p.UserID)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		p.CSRFToken = csrfToken
@@ -418,9 +439,11 @@ func getIndex(w http.ResponseWriter, r *http.Request) {
 	results := []Post{}
 
 	err := db.Select(&results,
-		"SELECT posts.`id`, posts.`user_id`, posts.`body`, posts.`mime`, posts.`created_at` FROM `posts`"+
-			" join users on users.id = posts.user_id"+
-			" where users.del_flg = 0"+
+		"SELECT posts.`id`, posts.`user_id`, posts.`body`, posts.`mime`, posts.`created_at` "+
+			" ,u.id as 'u.id', u.account_name as 'u.account_name', u.passhash as 'u.passhash', u.authority as 'u.authority', u.del_flg as 'u.del_flg', u.created_at as 'u.created_at'"+
+			" FROM `posts`"+
+			" join users as u on u.id = posts.user_id"+
+			" where u.del_flg = 0"+
 			" ORDER BY posts.created_at DESC"+
 			" LIMIT ?", postsPerPage)
 	if err != nil {

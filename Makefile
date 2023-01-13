@@ -41,7 +41,7 @@ deploy-conf: check-server-id deploy-db-conf deploy-nginx-conf deploy-service-fil
 
 # ベンチマークを走らせる直前に実行する
 .PHONY: bench
-bench: check-server-id discocat-now-status rm-logs deploy-conf build restart watch-service-log
+bench: check-server-id rm-logs deploy-conf build restart watch-service-log
 
 # slow queryを確認する
 .PHONY: slow-query
@@ -75,10 +75,10 @@ discocat-alp:
 # pprofで記録する
 .PHONY: pprof-record
 pprof-record:
-	echo "start pprof-record" | discocat
+#	echo "start pprof-record" | discocat
 	go tool pprof -top http://localhost:6060/debug/fgprof
 	$(eval latest := $(shell ls -rt pprof/ | tail -n 1))
-	echo "finish pprof-record\ncreated: $(latest)" | discocat
+#	echo "finish pprof-record\ncreated: $(latest)" | discocat
 
 # pprofで確認する
 .PHONY: pprof-check

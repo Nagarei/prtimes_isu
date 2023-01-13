@@ -83,14 +83,14 @@ discocat-alp:
 pprof-record:
 #	echo "start pprof-record" | discocat
 	go tool pprof -top http://localhost:6060/debug/pprof/profile
-	$(eval latest := $(shell ls -rt pprof/ | tail -n 1))
+	$(eval latest := $(shell ls -rt ~/pprof/ | tail -n 1))
 #	echo "finish pprof-record\ncreated: $(latest)" | discocat
 
 # pprofで確認する
 .PHONY: pprof-check
 pprof-check:
-	$(eval latest := $(shell ls -rt pprof/ | tail -n 1))
-	go tool pprof -http=localhost:8090 pprof/$(latest)
+	$(eval latest := $(shell ls -rt ~/pprof/ | tail -n 1))
+	go tool pprof -http=localhost:8090 ~/pprof/$(latest)
 
 # DBに接続する
 .PHONY: access-db

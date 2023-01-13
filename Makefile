@@ -200,9 +200,9 @@ build:
 .PHONY: restart
 restart:
 	sudo systemctl daemon-reload
+	sudo systemctl stop nginx
 	sudo systemctl restart $(SERVICE_NAME)
 	sudo systemctl restart mysql
-	sudo systemctl restart nginx
 
 .PHONY: mv-logs
 mv-logs:

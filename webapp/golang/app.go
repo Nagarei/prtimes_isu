@@ -678,6 +678,12 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func getImage(w http.ResponseWriter, r *http.Request) {
+	const etag = "W/\"1c529a68d22d142834b68e93aa2a5a65\""
+	if r.Header.Get("if-none-match") == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
 	pidStr := chi.URLParam(r, "id")
 	pid, err := strconv.Atoi(pidStr)
 	if err != nil {
@@ -699,6 +705,7 @@ func getImage(w http.ResponseWriter, r *http.Request) {
 		ext == "gif" && post.Mime == "image/gif" {
 		w.Header().Set("Content-Type", post.Mime)
 		w.Header().Set("Cache-Control", "max-age=604800, immutable")
+		w.Header().Set("etag", etag)
 		_, err := w.Write(post.Imgdata)
 		if err != nil {
 			log.Print(err)

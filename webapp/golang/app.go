@@ -798,22 +798,32 @@ func getImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	post := Post{}
-	err = db.Get(&post, "SELECT * FROM `posts` WHERE `id` = ?", pid)
-	if err != nil {
-		log.Print(err)
-		return
-	}
+	// post := Post{}
+	// err = db.Get(&post, "SELECT * FROM `posts` WHERE `id` = ?", pid)
+	// if err != nil {
+	// 	log.Print(err)
+	// 	return
+	// }
 
 	ext := chi.URLParam(r, "ext")
-
-	if ext == "jpg" && post.Mime == "image/jpeg" ||
-		ext == "png" && post.Mime == "image/png" ||
-		ext == "gif" && post.Mime == "image/gif" {
-		w.Header().Set("Content-Type", post.Mime)
+	if ext == "jpg" || ext == "png" || ext == "gif" {
+		imgdata, err := os.ReadFile(imageDir + "/" + strconv.Itoa(pid) + "." + ext)
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		mime := ""
+		if ext == "jpg" {
+			mime = "image/jpeg"
+		} else if ext == "png" {
+			mime = "image/png"
+		} else if ext == "gif" {
+			mime = "image/gif"
+		}
+		w.Header().Set("Content-Type", mime)
 		w.Header().Set("Cache-Control", "max-age=604800, immutable")
 		w.Header().Set("etag", etag)
-		_, err := w.Write(post.Imgdata)
+		_, err = w.Write(imgdata)
 		if err != nil {
 			log.Print(err)
 			return

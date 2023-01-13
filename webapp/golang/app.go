@@ -390,8 +390,8 @@ func getIndex(w http.ResponseWriter, r *http.Request) {
 
 	err := db.Select(&results,
 		"SELECT posts.`id`, posts.`user_id`, posts.`body`, posts.`mime`, posts.`created_at` FROM `posts`"+
-			" join users on user.id = posts.user_id"+
-			" where user.del_flg = 0"+
+			" join users on users.id = posts.user_id"+
+			" where users.del_flg = 0"+
 			" ORDER BY posts.created_at DESC"+
 			" LIMIT ?", postsPerPage)
 	if err != nil {

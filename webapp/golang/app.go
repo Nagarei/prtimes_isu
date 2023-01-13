@@ -176,33 +176,48 @@ func getFlash(w http.ResponseWriter, r *http.Request, key string) string {
 func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, error) {
 	var posts []Post
 
+	var postIDs []int
 	for _, p := range results {
-		err := db.Get(&p.CommentCount, "SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?", p.ID)
+		postIDs = append(postIDs, p.ID)
+	}
+
+	query_raw := "SELECT " +
+		" c.id as id, c.post_id as post_id, c.user_id as user_id, c.comment as comment, c.created_at as created_at" +
+		" ,u.id as 'u.id', u.account_name as 'u.account_name', u.passhash as 'u.passhash', u.authority as 'u.authority', u.del_flg as 'u.del_flg', u.created_at as 'u.created_at'" +
+		" FROM `comments` as c " +
+		" join users as u on u.id = c.user_id" +
+		" WHERE c.`post_id` IN (?) ORDER BY c.`post_id` DESC, c.`created_at` DESC"
+	if !allComments {
+		query_raw += " LIMIT " + strconv.Itoa(3*len(results))
+	}
+	query, params, err := sqlx.In(query_raw, postIDs)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var comments []Comment
+	err = db.Select(&comments, query, params...)
+	if err != nil {
+		return nil, err
+	}
+	comments_dict := map[int][]Comment{}
+	for _, c := range comments {
+		arr, ok := comments_dict[c.PostID]
+		if ok {
+			if len(arr) < 3 {
+				comments_dict[c.PostID] = append(arr, c)
+			}
+		} else {
+			comments_dict[c.PostID] = []Comment{c}
+		}
+	}
+
+	for _, p := range results {
+		err = db.Get(&p.CommentCount, "SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?", p.ID)
 		if err != nil {
 			return nil, err
 		}
 
-		query := "SELECT " +
-			" c.id as id, c.post_id as post_id, c.user_id as user_id, c.comment as comment, c.created_at as created_at" +
-			" ,u.id as 'u.id', u.account_name as 'u.account_name', u.passhash as 'u.passhash', u.authority as 'u.authority', u.del_flg as 'u.del_flg', u.created_at as 'u.created_at'" +
-			" FROM `comments` as c " +
-			" join users as u on u.id = c.user_id" +
-			" WHERE c.`post_id` = ? ORDER BY c.`created_at` DESC"
-		if !allComments {
-			query += " LIMIT 3"
-		}
-		var comments []Comment
-		err = db.Select(&comments, query, p.ID)
-		if err != nil {
-			return nil, err
-		}
-
-		// for i := 0; i < len(comments); i++ {
-		// 	err := db.Get(&comments[i].User, "SELECT * FROM `users` WHERE `id` = ?", comments[i].UserID)
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// }
+		var comments []Comment = comments_dict[p.ID]
 
 		// reverse
 		for i, j := 0, len(comments)-1; i < j; i, j = i+1, j-1 {

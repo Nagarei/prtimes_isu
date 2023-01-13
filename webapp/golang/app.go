@@ -588,6 +588,13 @@ func getAccountName(w http.ResponseWriter, r *http.Request) {
 	}{posts, user, postCount, commentCount, commentedCount, me})
 }
 
+var getPostsTemplate = template.Must(template.New("posts.html").Funcs(template.FuncMap{
+	"imageURL": imageURL,
+}).ParseFiles(
+	getTemplPath("posts.html"),
+	getTemplPath("post.html"),
+))
+
 func getPosts(w http.ResponseWriter, r *http.Request) {
 	m, err := url.ParseQuery(r.URL.RawQuery)
 	if err != nil {
@@ -630,16 +637,16 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-
-	fmap := template.FuncMap{
-		"imageURL": imageURL,
-	}
-
-	template.Must(template.New("posts.html").Funcs(fmap).ParseFiles(
-		getTemplPath("posts.html"),
-		getTemplPath("post.html"),
-	)).Execute(w, posts)
+	getPostsTemplate.Execute(w, posts)
 }
+
+var getPostsIDTemplate = template.Must(template.New("layout.html").Funcs(template.FuncMap{
+	"imageURL": imageURL,
+}).ParseFiles(
+	getTemplPath("layout.html"),
+	getTemplPath("post_id.html"),
+	getTemplPath("post.html"),
+))
 
 func getPostsID(w http.ResponseWriter, r *http.Request) {
 	pidStr := chi.URLParam(r, "id")
@@ -675,16 +682,7 @@ func getPostsID(w http.ResponseWriter, r *http.Request) {
 	p := posts[0]
 
 	me := getSessionUser(r)
-
-	fmap := template.FuncMap{
-		"imageURL": imageURL,
-	}
-
-	template.Must(template.New("layout.html").Funcs(fmap).ParseFiles(
-		getTemplPath("layout.html"),
-		getTemplPath("post_id.html"),
-		getTemplPath("post.html"),
-	)).Execute(w, struct {
+	getPostsIDTemplate.Execute(w, struct {
 		Post Post
 		Me   User
 	}{p, me})

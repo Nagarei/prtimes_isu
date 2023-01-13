@@ -637,7 +637,8 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	getPostsTemplate.Execute(w, posts)
+	//getPostsTemplate.Execute(w, posts)
+	w.Write([]byte(postsTemplate(posts, "")))
 }
 
 var getPostsIDTemplate = template.Must(template.New("layout.html").Funcs(template.FuncMap{

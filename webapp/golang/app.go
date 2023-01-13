@@ -683,10 +683,12 @@ func getPostsID(w http.ResponseWriter, r *http.Request) {
 	p := posts[0]
 
 	me := getSessionUser(r)
-	getPostsIDTemplate.Execute(w, struct {
-		Post Post
-		Me   User
-	}{p, me})
+
+	w.Write([]byte(layoutTemplate(me, postTemplate(p, ""))))
+	// getPostsIDTemplate.Execute(w, struct {
+	// 	Post Post
+	// 	Me   User
+	// }{p, me})
 }
 func MimeToExt(mime string) string {
 	ext := ""

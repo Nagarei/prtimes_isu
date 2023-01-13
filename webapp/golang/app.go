@@ -609,9 +609,10 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 	results := []Post{}
 	err = db.Select(&results,
 		"SELECT posts.`id`, posts.`user_id`, posts.`body`, posts.`mime`, posts.`created_at`"+
+			" ,u.id as 'u.id', u.account_name as 'u.account_name', u.passhash as 'u.passhash', u.authority as 'u.authority', u.del_flg as 'u.del_flg', u.created_at as 'u.created_at'"+
 			" FROM `posts` ignore index (userid_createdat) "+
-			" join users on users.id = posts.user_id"+
-			" where posts.created_at <= ? AND users.del_flg = 0"+
+			" join users as u on u.id = posts.user_id"+
+			" where posts.created_at <= ? AND u.del_flg = 0"+
 			" ORDER BY posts.created_at DESC"+
 			" LIMIT ?", t.Format(ISO8601Format), postsPerPage)
 	if err != nil {

@@ -35,6 +35,7 @@ const (
 	postsPerPage  = 20
 	ISO8601Format = "2006-01-02T15:04:05-07:00"
 	UploadLimit   = 10 * 1024 * 1024 // 10mb
+	imageDir      = "../images"
 )
 
 type User struct {
@@ -79,6 +80,19 @@ func init() {
 }
 
 func dbInitialize() {
+	{
+		results := []Post{}
+		err := db.Select(&results, "SELECT `id`, `mime` FROM `posts` WHERE id > 10000")
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		for _, p := range results {
+			ext := MimeToExt(p.Mime)
+			os.Remove(imageDir + "/" + strconv.Itoa(p.ID) + "." + ext)
+		}
+	}
+
 	sqls := []string{
 		"DELETE FROM users WHERE id > 1000",
 		"DELETE FROM posts WHERE id > 10000",
@@ -89,6 +103,19 @@ func dbInitialize() {
 
 	for _, sql := range sqls {
 		db.Exec(sql)
+	}
+	if _, err := os.Stat(imageDir); err != nil {
+		// not exists
+		os.Mkdir(imageDir, os.ModePerm)
+		results := []Post{}
+		err := db.Select(&results, "SELECT `id`, `mime`, `imgdata` FROM `posts`")
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		for _, p := range results {
+			WriteFile((int64)(p.ID), p.Mime, p.Imgdata)
+		}
 	}
 }
 
@@ -651,7 +678,31 @@ func getPostsID(w http.ResponseWriter, r *http.Request) {
 		Me   User
 	}{p, me})
 }
-
+func MimeToExt(mime string) string {
+	ext := ""
+	if mime == "image/jpeg" {
+		ext = "jpg"
+	} else if mime == "image/png" {
+		ext = "png"
+	} else if mime == "image/gif" {
+		ext = "gif"
+	}
+	return ext
+}
+func WriteFile(pid int64, mime string, filedata []byte) {
+	ext := MimeToExt(mime)
+	f, err := os.Create(imageDir + "/" + strconv.FormatInt(pid, 10) + "." + ext)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	defer f.Close()
+	_, err = f.Write(filedata)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+}
 func postIndex(w http.ResponseWriter, r *http.Request) {
 	me := getSessionUser(r)
 	if !isLogin(me) {
@@ -727,6 +778,8 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 		return
 	}
+	//ファイル書き出し
+	WriteFile(pid, mime, filedata)
 
 	http.Redirect(w, r, "/posts/"+strconv.FormatInt(pid, 10), http.StatusFound)
 }

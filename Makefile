@@ -168,7 +168,7 @@ get-service-file:
 
 .PHONY: get-envsh
 get-envsh:
-	cp $(WORKDIR)/$(ENV_FILE) $(WORKDIR)/$(SERVER_ID)/home/isucon/$(ENV_FILE)
+	cp $(WORKDIR)/$(ENV_FILE) $(WORKDIR)/$(SERVER_ID)/$(ENV_FILE)
 
 .PHONY: deploy-db-conf
 deploy-db-conf:

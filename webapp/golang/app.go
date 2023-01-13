@@ -16,8 +16,6 @@ import (
 	"strings"
 	"time"
 
-	_ "net/http/pprof"
-
 	"github.com/bradfitz/gomemcache/memcache"
 	gsm "github.com/bradleypeabody/gorilla-sessions-memcache"
 	"github.com/go-chi/chi/v5"
@@ -35,6 +33,7 @@ const (
 	postsPerPage  = 20
 	ISO8601Format = "2006-01-02T15:04:05-07:00"
 	UploadLimit   = 10 * 1024 * 1024 // 10mb
+	imageDir      = "../images"
 )
 
 type User struct {
@@ -79,6 +78,19 @@ func init() {
 }
 
 func dbInitialize() {
+	{
+		results := []Post{}
+		err := db.Select(&results, "SELECT `id`, `mime` FROM `posts` WHERE id > 10000")
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		for _, p := range results {
+			ext := MimeToExt(p.Mime)
+			os.Remove(imageDir + "/" + strconv.Itoa(p.ID) + "." + ext)
+		}
+	}
+
 	sqls := []string{
 		"DELETE FROM users WHERE id > 1000",
 		"DELETE FROM posts WHERE id > 10000",
@@ -89,6 +101,19 @@ func dbInitialize() {
 
 	for _, sql := range sqls {
 		db.Exec(sql)
+	}
+	if _, err := os.Stat(imageDir); err != nil {
+		// not exists
+		os.Mkdir(imageDir, os.ModePerm)
+		results := []Post{}
+		err := db.Select(&results, "SELECT `id`, `mime`, `imgdata` FROM `posts`")
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		for _, p := range results {
+			WriteFile((int64)(p.ID), p.Mime, p.Imgdata)
+		}
 	}
 }
 
@@ -441,7 +466,7 @@ func getIndex(w http.ResponseWriter, r *http.Request) {
 	err := db.Select(&results,
 		"SELECT posts.`id`, posts.`user_id`, posts.`body`, posts.`mime`, posts.`created_at` "+
 			" ,u.id as 'u.id', u.account_name as 'u.account_name', u.passhash as 'u.passhash', u.authority as 'u.authority', u.del_flg as 'u.del_flg', u.created_at as 'u.created_at'"+
-			" FROM `posts`"+
+			" FROM `posts` IGNORE INDEX (userid_createdat)"+
 			" join users as u on u.id = posts.user_id"+
 			" where u.del_flg = 0"+
 			" ORDER BY posts.created_at DESC"+
@@ -457,13 +482,15 @@ func getIndex(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 		return
 	}
+	w.Write([]byte(layoutTemplate(me, indexTemplate(posts, csrf_token, getFlash(w, r, "notice")))))
+	//w.WriteHeader(http.StatusOK)
 
-	index_layout.Execute(w, struct {
-		Posts     []Post
-		Me        User
-		CSRFToken string
-		Flash     string
-	}{posts, me, csrf_token, getFlash(w, r, "notice")})
+	// index_layout.Execute(w, struct {
+	// 	Posts     []Post
+	// 	Me        User
+	// 	CSRFToken string
+	// 	Flash     string
+	// }{posts, me, csrf_token, getFlash(w, r, "notice")})
 }
 
 func getAccountName(w http.ResponseWriter, r *http.Request) {
@@ -481,18 +508,27 @@ func getAccountName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results := []Post{}
+	var posts []Post
+	if user.DelFlg == 0 {
+		results := []Post{}
+		err = db.Select(&results,
+			"SELECT posts.`id`, posts.`user_id`, posts.`body`, posts.`mime`, posts.`created_at` FROM `posts`"+
+				" where posts.`user_id` = ?"+
+				" ORDER BY posts.created_at DESC"+
+				" LIMIT ?", user.ID, postsPerPage)
+		if err != nil {
+			log.Print(err)
+			return
+		}
+		for _, p := range results {
+			p.User = user
+		}
 
-	err = db.Select(&results, "SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` WHERE `user_id` = ? ORDER BY `created_at` DESC", user.ID)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-
-	posts, err := makePosts(results, getCSRFToken(r), false)
-	if err != nil {
-		log.Print(err)
-		return
+		posts, err = makePosts(results, getCSRFToken(r), false)
+		if err != nil {
+			log.Print(err)
+			return
+		}
 	}
 
 	commentCount := 0
@@ -552,6 +588,13 @@ func getAccountName(w http.ResponseWriter, r *http.Request) {
 	}{posts, user, postCount, commentCount, commentedCount, me})
 }
 
+var getPostsTemplate = template.Must(template.New("posts.html").Funcs(template.FuncMap{
+	"imageURL": imageURL,
+}).ParseFiles(
+	getTemplPath("posts.html"),
+	getTemplPath("post.html"),
+))
+
 func getPosts(w http.ResponseWriter, r *http.Request) {
 	m, err := url.ParseQuery(r.URL.RawQuery)
 	if err != nil {
@@ -572,9 +615,11 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 
 	results := []Post{}
 	err = db.Select(&results,
-		"SELECT posts.`id`, posts.`user_id`, posts.`body`, posts.`mime`, posts.`created_at` FROM `posts`"+
-			" join users on users.id = posts.user_id"+
-			" where posts.created_at <= ? AND users.del_flg = 0"+
+		"SELECT posts.`id`, posts.`user_id`, posts.`body`, posts.`mime`, posts.`created_at`"+
+			" ,u.id as 'u.id', u.account_name as 'u.account_name', u.passhash as 'u.passhash', u.authority as 'u.authority', u.del_flg as 'u.del_flg', u.created_at as 'u.created_at'"+
+			" FROM `posts` ignore index (userid_createdat) "+
+			" join users as u on u.id = posts.user_id"+
+			" where posts.created_at <= ? AND u.del_flg = 0"+
 			" ORDER BY posts.created_at DESC"+
 			" LIMIT ?", t.Format(ISO8601Format), postsPerPage)
 	if err != nil {
@@ -592,16 +637,17 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-
-	fmap := template.FuncMap{
-		"imageURL": imageURL,
-	}
-
-	template.Must(template.New("posts.html").Funcs(fmap).ParseFiles(
-		getTemplPath("posts.html"),
-		getTemplPath("post.html"),
-	)).Execute(w, posts)
+	//getPostsTemplate.Execute(w, posts)
+	w.Write([]byte(postsTemplate(posts, "")))
 }
+
+var getPostsIDTemplate = template.Must(template.New("layout.html").Funcs(template.FuncMap{
+	"imageURL": imageURL,
+}).ParseFiles(
+	getTemplPath("layout.html"),
+	getTemplPath("post_id.html"),
+	getTemplPath("post.html"),
+))
 
 func getPostsID(w http.ResponseWriter, r *http.Request) {
 	pidStr := chi.URLParam(r, "id")
@@ -638,20 +684,37 @@ func getPostsID(w http.ResponseWriter, r *http.Request) {
 
 	me := getSessionUser(r)
 
-	fmap := template.FuncMap{
-		"imageURL": imageURL,
-	}
-
-	template.Must(template.New("layout.html").Funcs(fmap).ParseFiles(
-		getTemplPath("layout.html"),
-		getTemplPath("post_id.html"),
-		getTemplPath("post.html"),
-	)).Execute(w, struct {
-		Post Post
-		Me   User
-	}{p, me})
+	w.Write([]byte(layoutTemplate(me, postTemplate(p, ""))))
+	// getPostsIDTemplate.Execute(w, struct {
+	// 	Post Post
+	// 	Me   User
+	// }{p, me})
 }
-
+func MimeToExt(mime string) string {
+	ext := ""
+	if mime == "image/jpeg" {
+		ext = "jpg"
+	} else if mime == "image/png" {
+		ext = "png"
+	} else if mime == "image/gif" {
+		ext = "gif"
+	}
+	return ext
+}
+func WriteFile(pid int64, mime string, filedata []byte) {
+	ext := MimeToExt(mime)
+	f, err := os.Create(imageDir + "/" + strconv.FormatInt(pid, 10) + "." + ext)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	defer f.Close()
+	_, err = f.Write(filedata)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+}
 func postIndex(w http.ResponseWriter, r *http.Request) {
 	me := getSessionUser(r)
 	if !isLogin(me) {
@@ -714,7 +777,7 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 		query,
 		me.ID,
 		mime,
-		filedata,
+		[]byte{},
 		r.FormValue("body"),
 	)
 	if err != nil {
@@ -727,6 +790,8 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 		return
 	}
+	//ファイル書き出し
+	WriteFile(pid, mime, filedata)
 
 	http.Redirect(w, r, "/posts/"+strconv.FormatInt(pid, 10), http.StatusFound)
 }
@@ -745,22 +810,32 @@ func getImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	post := Post{}
-	err = db.Get(&post, "SELECT * FROM `posts` WHERE `id` = ?", pid)
-	if err != nil {
-		log.Print(err)
-		return
-	}
+	// post := Post{}
+	// err = db.Get(&post, "SELECT * FROM `posts` WHERE `id` = ?", pid)
+	// if err != nil {
+	// 	log.Print(err)
+	// 	return
+	// }
 
 	ext := chi.URLParam(r, "ext")
-
-	if ext == "jpg" && post.Mime == "image/jpeg" ||
-		ext == "png" && post.Mime == "image/png" ||
-		ext == "gif" && post.Mime == "image/gif" {
-		w.Header().Set("Content-Type", post.Mime)
+	if ext == "jpg" || ext == "png" || ext == "gif" {
+		imgfile, err := os.Open(imageDir + "/" + strconv.Itoa(pid) + "." + ext)
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		mime := ""
+		if ext == "jpg" {
+			mime = "image/jpeg"
+		} else if ext == "png" {
+			mime = "image/png"
+		} else if ext == "gif" {
+			mime = "image/gif"
+		}
+		w.Header().Set("Content-Type", mime)
 		w.Header().Set("Cache-Control", "max-age=604800, immutable")
 		w.Header().Set("etag", etag)
-		_, err := w.Write(post.Imgdata)
+		_, err = io.Copy(w, imgfile)
 		if err != nil {
 			log.Print(err)
 			return
@@ -861,9 +936,9 @@ func postAdminBanned(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
+	// go func() {
+	// 	log.Println(http.ListenAndServe("localhost:6060", nil))
+	// }()
 
 	host := os.Getenv("ISUCONP_DB_HOST")
 	if host == "" {
@@ -923,5 +998,128 @@ func main() {
 		http.FileServer(http.Dir("../public")).ServeHTTP(w, r)
 	})
 
-	log.Fatal(http.ListenAndServe(":8080", r))
+	log.Fatal(http.ListenAndServe(":80", r))
+}
+
+func layoutTemplate(Me User, content string) string {
+	res := ""
+	res += `<!DOCTYPE html>
+	<html>
+	  <head>
+		<meta charset="utf-8">
+		<title>Iscogram</title>
+		<link href="/css/style.css" media="screen" rel="stylesheet" type="text/css">
+	  </head>
+	  <body>
+		<div class="container">
+		  <div class="header">
+			<div class="isu-title">
+			  <h1><a href="/">Iscogram</a></h1>
+			</div>
+			<div class="isu-header-menu">`
+	if Me.ID == 0 {
+		res += `<div><a href="/login">ログイン</a></div>`
+	} else {
+		res += `<div><a href="/@` + Me.AccountName + `"><span class="isu-account-name">` + Me.AccountName + `</span>さん</a></div>`
+		if Me.Authority == 1 {
+			res += `<div><a href="/admin/banned">管理者用ページ</a></div>`
+		}
+		res += `<div><a href="/logout">ログアウト</a></div>`
+	}
+	res += `
+			</div>
+		  </div>`
+	res += content
+	res += `
+		</div>
+		<script src="/js/timeago.min.js"></script>
+		<script src="/js/main.js"></script>
+	  </body>
+	</html>`
+	return res
+}
+func indexTemplate(
+	Posts []Post,
+	CSRFToken string,
+	Flash string) string {
+	res := ""
+	res += `
+	<div class="isu-submit">
+	  <form method="post" action="/" enctype="multipart/form-data">
+		<div class="isu-form">
+		  <input type="file" name="file" value="file">
+		</div>
+		<div class="isu-form">
+		  <textarea name="body"></textarea>
+		</div>
+		<div class="form-submit">
+		  <input type="hidden" name="csrf_token" value="` + CSRFToken + `">
+		  <input type="submit" name="submit" value="submit">
+		</div>`
+	if Flash != "" {
+		res += `<div id="notice-message" class="alert alert-danger">` +
+			Flash +
+			`</div>`
+	}
+	res += `</form>
+	</div>`
+
+	res += postsTemplate(Posts, CSRFToken)
+	res += `<div id="isu-post-more">
+	  <button id="isu-post-more-btn">もっと見る</button>
+	  <img class="isu-loading-icon" src="/img/ajax-loader.gif">
+	</div>`
+	return res
+}
+func postsTemplate(ps []Post, CSRFToken string) string {
+	res := ""
+	for _, p := range ps {
+		res += `<div class="isu-posts">` + postTemplate(p, CSRFToken) +
+			`</div>`
+
+	}
+	return res
+}
+func postTemplate(p Post, CSRFToken string) string {
+	res := ""
+	res += `<div class="isu-post" id="pid_` + strconv.Itoa(p.ID) + `" data-created-at="` + p.CreatedAt.Format("2006-01-02T15:04:05-07:00") + `">
+  <div class="isu-post-header">
+    <a href="/@` + p.User.AccountName + ` " class="isu-post-account-name">` + p.User.AccountName + `</a>
+    <a href="/posts/` + strconv.Itoa(p.ID) + `" class="isu-post-permalink">
+      <time class="timeago" datetime="` + p.CreatedAt.Format("2006-01-02T15:04:05-07:00") + `"></time>
+    </a>
+  </div>
+  <div class="isu-post-image">
+    <img src="` + imageURL(p) + `" class="isu-image">
+  </div>
+  <div class="isu-post-text">
+    <a href="/@` + p.User.AccountName + `" class="isu-post-account-name">` + p.User.AccountName + `</a>
+    ` + p.Body + `
+  </div>
+  <div class="isu-post-comment">
+    <div class="isu-post-comment-count">
+      comments: <b>` + strconv.Itoa(p.CommentCount) + `</b>
+    </div>
+`
+	for _, c := range p.Comments {
+		res += `
+		<div class="isu-comment">
+		  <a href="/@` + c.User.AccountName + `" class="isu-comment-account-name">` + c.User.AccountName + `</a>
+		  <span class="isu-comment-text">` + c.Comment + `</span>
+		</div>
+		`
+	}
+	res += `
+    <div class="isu-comment-form">
+      <form method="post" action="/comment">
+        <input type="text" name="comment">
+        <input type="hidden" name="post_id" value="` + strconv.Itoa(p.ID) + `">
+        <input type="hidden" name="csrf_token" value="` + CSRFToken + `">
+        <input type="submit" name="submit" value="submit">
+      </form>
+    </div>
+  </div>
+</div>`
+
+	return res
 }

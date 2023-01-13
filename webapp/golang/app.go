@@ -483,7 +483,7 @@ func getIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write([]byte(layoutTemplate(me, indexTemplate(posts, csrf_token, getFlash(w, r, "notice")))))
-	w.WriteHeader(http.StatusOK)
+	//w.WriteHeader(http.StatusOK)
 
 	// index_layout.Execute(w, struct {
 	// 	Posts     []Post

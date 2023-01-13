@@ -54,7 +54,7 @@ discocat-slow-query:
 	echo "SERVER_ID: $(SERVER_ID)" >> $(DISCOCAT_TMPFILE)
 	echo "" >> $(DISCOCAT_TMPFILE)
 	@make slow-query >> $(DISCOCAT_TMPFILE)
-	cat $(DISCOCAT_TMPFILE) | discocat
+	cat $(DISCOCAT_TMPFILE) | head 500
 
 # alpでアクセスログを確認する
 .PHONY: alp
@@ -70,13 +70,13 @@ discocat-alp:
 	echo "" >> $(DISCOCAT_TMPFILE)
 	@make alp >> $(DISCOCAT_TMPFILE)
 	cat $(DISCOCAT_TRIPLE_BACK_QUOTES) >> $(DISCOCAT_TMPFILE)
-	cat $(DISCOCAT_TMPFILE) | discocat
+	cat $(DISCOCAT_TMPFILE)
 
 # pprofで記録する
 .PHONY: pprof-record
 pprof-record:
 #	echo "start pprof-record" | discocat
-	go tool pprof -top http://localhost:6060/debug/fgprof
+	go tool pprof -top http://localhost:6060/debug/pprof/profile
 	$(eval latest := $(shell ls -rt pprof/ | tail -n 1))
 #	echo "finish pprof-record\ncreated: $(latest)" | discocat
 

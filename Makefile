@@ -9,7 +9,7 @@ USER:=isucon
 BIN_NAME:=app
 BUILD_DIR:=/home/isucon/private_isu/webapp/golang
 SERVICE_NAME:=isu-go.service
-WORKDIR:=~/private_isu
+WORKDIR:=/home/isucon/private_isu
 
 DB_PATH:=/etc/mysql
 NGINX_PATH:=/etc/nginx

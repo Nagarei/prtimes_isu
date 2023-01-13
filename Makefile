@@ -9,6 +9,7 @@ USER:=isucon
 BIN_NAME:=app
 BUILD_DIR:=/home/isucon/private-isu/webapp/golang
 SERVICE_NAME:=isu-go.service
+WORKDIR:=~/private_isu
 
 DB_PATH:=/etc/mysql
 NGINX_PATH:=/etc/nginx
@@ -152,38 +153,38 @@ set-as-s5:
 
 .PHONY: get-db-conf
 get-db-conf:
-	sudo cp -R $(DB_PATH)/* ~/$(SERVER_ID)/etc/mysql
-	sudo chown $(USER) -R ~/$(SERVER_ID)/etc/mysql
+	sudo cp -R $(DB_PATH)/* $(WORKDIR)/$(SERVER_ID)/etc/mysql
+	sudo chown $(USER) -R $(WORKDIR)/$(SERVER_ID)/etc/mysql
 
 .PHONY: get-nginx-conf
 get-nginx-conf:
-	sudo cp -R $(NGINX_PATH)/* ~/$(SERVER_ID)/etc/nginx
-	sudo chown $(USER) -R ~/$(SERVER_ID)/etc/nginx
+	sudo cp -R $(NGINX_PATH)/* $(WORKDIR)/$(SERVER_ID)/etc/nginx
+	sudo chown $(USER) -R $(WORKDIR)/$(SERVER_ID)/etc/nginx
 
 .PHONY: get-service-file
 get-service-file:
-	sudo cp $(SYSTEMD_PATH)/$(SERVICE_NAME) ~/$(SERVER_ID)/etc/systemd/system/$(SERVICE_NAME)
-	sudo chown $(USER) ~/$(SERVER_ID)/etc/systemd/system/$(SERVICE_NAME)
+	sudo cp $(SYSTEMD_PATH)/$(SERVICE_NAME) $(WORKDIR)/$(SERVER_ID)/etc/systemd/system/$(SERVICE_NAME)
+	sudo chown $(USER) $(WORKDIR)/$(SERVER_ID)/etc/systemd/system/$(SERVICE_NAME)
 
 .PHONY: get-envsh
 get-envsh:
-	cp ~/$(ENV_FILE) ~/$(SERVER_ID)/home/isucon/$(ENV_FILE)
+	cp $(WORKDIR)/$(ENV_FILE) $(WORKDIR)/$(SERVER_ID)/home/isucon/$(ENV_FILE)
 
 .PHONY: deploy-db-conf
 deploy-db-conf:
-	sudo cp -R ~/$(SERVER_ID)/etc/mysql/* $(DB_PATH)
+	sudo cp -R $(WORKDIR)/$(SERVER_ID)/etc/mysql/* $(DB_PATH)
 
 .PHONY: deploy-nginx-conf
 deploy-nginx-conf:
-	sudo cp -R ~/$(SERVER_ID)/etc/nginx/* $(NGINX_PATH)
+	sudo cp -R $(WORKDIR)/$(SERVER_ID)/etc/nginx/* $(NGINX_PATH)
 
 .PHONY: deploy-service-file
 deploy-service-file:
-	sudo cp ~/$(SERVER_ID)/etc/systemd/system/$(SERVICE_NAME) $(SYSTEMD_PATH)/$(SERVICE_NAME)
+	sudo cp $(WORKDIR)/$(SERVER_ID)/etc/systemd/system/$(SERVICE_NAME) $(SYSTEMD_PATH)/$(SERVICE_NAME)
 
 .PHONY: deploy-envsh
 deploy-envsh:
-	cp ~/$(SERVER_ID)/home/isucon/$(ENV_FILE) ~/$(ENV_FILE)
+	cp $(WORKDIR)/$(SERVER_ID)/home/isucon/$(ENV_FILE) $(WORKDIR)/$(ENV_FILE)
 
 .PHONY: build
 build:
@@ -201,11 +202,11 @@ restart:
 mv-logs:
 	$(eval when := $(shell date "+%s"))
 	sudo test -f $(NGINX_LOG) && \
-            mkdir -p ~/logs/nginx/$(when) && \
-	    sudo mv -f $(NGINX_LOG) ~/logs/nginx/$(when)/ || echo ""
+            mkdir -p $(WORKDIR)/logs/nginx/$(when) && \
+	    sudo mv -f $(NGINX_LOG) $(WORKDIR)/logs/nginx/$(when)/ || echo ""
 	sudo test -f $(DB_SLOW_LOG) && \
-		mkdir -p ~/logs/mysql/$(when) && \
-		sudo mv -f $(DB_SLOW_LOG) ~/logs/mysql/$(when)/ || echo ""
+		mkdir -p $(WORKDIR)/logs/mysql/$(when) && \
+		sudo mv -f $(DB_SLOW_LOG) $(WORKDIR)/logs/mysql/$(when)/ || echo ""
 
 .PHONY: rm-logs
 rm-logs:

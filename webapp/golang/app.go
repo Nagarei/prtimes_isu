@@ -508,23 +508,27 @@ func getAccountName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results := []Post{}
+	var posts []Post
+	if user.DelFlg == 0 {
+		results := []Post{}
+		err = db.Select(&results,
+			"SELECT posts.`id`, posts.`user_id`, posts.`body`, posts.`mime`, posts.`created_at` FROM `posts`"+
+				" where posts.`user_id` = ?"+
+				" ORDER BY posts.created_at DESC"+
+				" LIMIT ?", user.ID, postsPerPage)
+		if err != nil {
+			log.Print(err)
+			return
+		}
+		for _, p := range results {
+			p.User = user
+		}
 
-	err = db.Select(&results,
-		"SELECT posts.`id`, posts.`user_id`, posts.`body`, posts.`mime`, posts.`created_at` FROM `posts`"+
-			" join users on users.id = posts.user_id"+
-			" where posts.`user_id` = ? AND users.del_flg = 0"+
-			" ORDER BY posts.created_at DESC"+
-			" LIMIT ?", user.ID, postsPerPage)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-
-	posts, err := makePosts(results, getCSRFToken(r), false)
-	if err != nil {
-		log.Print(err)
-		return
+		posts, err = makePosts(results, getCSRFToken(r), false)
+		if err != nil {
+			log.Print(err)
+			return
+		}
 	}
 
 	commentCount := 0

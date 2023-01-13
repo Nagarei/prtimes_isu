@@ -1017,7 +1017,7 @@ func layoutTemplate(Me User, content string) string {
 	if Me.ID == 0 {
 		res += `<div><a href="/login">ログイン</a></div>`
 	} else {
-		res += `<div><a href="/@{{.Me.AccountName}}"><span class="isu-account-name">{{.Me.AccountName}}</span>さん</a></div>`
+		res += `<div><a href="/@` + Me.AccountName + `"><span class="isu-account-name">` + Me.AccountName + `</span>さん</a></div>`
 		if Me.Authority == 1 {
 			res += `<div><a href="/admin/banned">管理者用ページ</a></div>`
 		}

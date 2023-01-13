@@ -482,13 +482,14 @@ func getIndex(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 		return
 	}
+	return c.HTML(http.StatusOK, layoutTemplate(me, indexTemplate(posts, csrf_token, getFlash(w, r, "notice"))))
 
-	index_layout.Execute(w, struct {
-		Posts     []Post
-		Me        User
-		CSRFToken string
-		Flash     string
-	}{posts, me, csrf_token, getFlash(w, r, "notice")})
+	// index_layout.Execute(w, struct {
+	// 	Posts     []Post
+	// 	Me        User
+	// 	CSRFToken string
+	// 	Flash     string
+	// }{posts, me, csrf_token, getFlash(w, r, "notice")})
 }
 
 func getAccountName(w http.ResponseWriter, r *http.Request) {
@@ -994,4 +995,127 @@ func main() {
 	})
 
 	log.Fatal(http.ListenAndServe(":80", r))
+}
+
+func layoutTemplate(Me User, content string) string {
+	res := ""
+	res += `<!DOCTYPE html>
+	<html>
+	  <head>
+		<meta charset="utf-8">
+		<title>Iscogram</title>
+		<link href="/css/style.css" media="screen" rel="stylesheet" type="text/css">
+	  </head>
+	  <body>
+		<div class="container">
+		  <div class="header">
+			<div class="isu-title">
+			  <h1><a href="/">Iscogram</a></h1>
+			</div>
+			<div class="isu-header-menu">`
+	if Me.ID ==0 {
+		res += `<div><a href="/login">ログイン</a></div>`
+	} else {
+		res += `<div><a href="/@{{.Me.AccountName}}"><span class="isu-account-name">{{.Me.AccountName}}</span>さん</a></div>`
+		if Me.Authority == 1 {
+			res += `<div><a href="/admin/banned">管理者用ページ</a></div>`
+		}
+		res += `<div><a href="/logout">ログアウト</a></div>`
+	}
+	res += `
+			</div>
+		  </div>`
+	res += content
+	res += `
+		</div>
+		<script src="/js/timeago.min.js"></script>
+		<script src="/js/main.js"></script>
+	  </body>
+	</html>`
+	return res	
+}
+func indexTemplate(
+	Posts     []Post,
+	CSRFToken string,
+	Flash     string) string {
+	res := ""
+	res += `
+	<div class="isu-submit">
+	  <form method="post" action="/" enctype="multipart/form-data">
+		<div class="isu-form">
+		  <input type="file" name="file" value="file">
+		</div>
+		<div class="isu-form">
+		  <textarea name="body"></textarea>
+		</div>
+		<div class="form-submit">
+		  <input type="hidden" name="csrf_token" value="`+CSRFToken+`">
+		  <input type="submit" name="submit" value="submit">
+		</div>`
+	if Flash != "" {
+		res += `<div id="notice-message" class="alert alert-danger">`+
+			Flash+
+			`</div>`
+	}
+	res += `</form>
+	</div>`
+	
+	res += postsTemplate(Posts, CSRFToken)
+	res += `<div id="isu-post-more">
+	  <button id="isu-post-more-btn">もっと見る</button>
+	  <img class="isu-loading-icon" src="/img/ajax-loader.gif">
+	</div>`
+	return res
+}
+func postsTemplate(ps []Post, CSRFToken string) string {
+	res := ""
+	for _, p := range ps {
+		res += `<div class="isu-posts">`+postTemplate(p,CSRFToken)+
+	  `</div>`
+	  
+	}
+	return res
+}
+func postTemplate(p Post, CSRFToken string) string {
+	res := ""
+	res += `<div class="isu-post" id="pid_` + strconv.Itoa(p.ID) + `" data-created-at="` + p.CreatedAt.Format("2006-01-02T15:04:05-07:00") + `">
+  <div class="isu-post-header">
+    <a href="/@` + p.User.AccountName + ` " class="isu-post-account-name">` + p.User.AccountName + `</a>
+    <a href="/posts/` + strconv.Itoa(p.ID) + `" class="isu-post-permalink">
+      <time class="timeago" datetime="` + p.CreatedAt.Format("2006-01-02T15:04:05-07:00") + `"></time>
+    </a>
+  </div>
+  <div class="isu-post-image">
+    <img src="` + imageURL(p) + `" class="isu-image">
+  </div>
+  <div class="isu-post-text">
+    <a href="/@` + p.User.AccountName + `" class="isu-post-account-name">` + p.User.AccountName + `</a>
+    ` + p.Body + `
+  </div>
+  <div class="isu-post-comment">
+    <div class="isu-post-comment-count">
+      comments: <b>` + strconv.Itoa(p.CommentCount) + `</b>
+    </div>
+`
+	for _, c := range p.Comments {
+		res += `
+		<div class="isu-comment">
+		  <a href="/@` + p.User.AccountName + `" class="isu-comment-account-name">` + p.User.AccountName + `</a>
+		  <span class="isu-comment-text">` + c.Comment + `</span>
+		</div>
+		`
+	}
+	res += `
+    <div class="isu-comment-form">
+      <form method="post" action="/comment">
+        <input type="text" name="comment">
+        <input type="hidden" name="post_id" value="`+strconv.Itoa(p.ID)`">
+        <input type="hidden" name="csrf_token" value="`+CSRFToken+`">
+        <input type="submit" name="submit" value="submit">
+      </form>
+    </div>
+  </div>
+</div>`
+
+	return res
 }

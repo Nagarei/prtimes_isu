@@ -25,6 +25,7 @@ NETDATA_CUSTUM_HTML:=tool-config/netdata/*
 DISCOCAT_TRIPLE_BACK_QUOTES:=tool-config/discocat/triple-back-quotes.txt
 DISCOCAT_TMPFILE:=tmp/discocat
 
+ISUCON_DB_PORT=3306
 ISUCON_DB_HOST=localhost
 ISUCON_DB_USER=isuconp
 ISUCON_DB_PASSWORD=isuconp

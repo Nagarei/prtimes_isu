@@ -12,11 +12,12 @@ matching_groups:            # array
   - ^/logout$
   - ^/$
   - ^/posts$
+  - ^/posts?max_created_at=[-0-9A-Z%]$
   - ^/posts/[0-9]+$
   - ^/image/[0-9]+\.\w+$
   - ^/comment$
   - ^/admin/banned$
-
+  - ^/@[a-zA-Z]+$
 
 
 # file:                       # string

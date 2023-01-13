@@ -807,7 +807,7 @@ func getImage(w http.ResponseWriter, r *http.Request) {
 
 	ext := chi.URLParam(r, "ext")
 	if ext == "jpg" || ext == "png" || ext == "gif" {
-		imgdata, err := os.ReadFile(imageDir + "/" + strconv.Itoa(pid) + "." + ext)
+		imgfile, err := os.Open(imageDir + "/" + strconv.Itoa(pid) + "." + ext)
 		if err != nil {
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -823,7 +823,7 @@ func getImage(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", mime)
 		w.Header().Set("Cache-Control", "max-age=604800, immutable")
 		w.Header().Set("etag", etag)
-		_, err = w.Write(imgdata)
+		_, err = io.Copy(w, imgfile)
 		if err != nil {
 			log.Print(err)
 			return

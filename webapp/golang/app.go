@@ -1101,7 +1101,7 @@ func postTemplate(p Post, CSRFToken string) string {
 	for _, c := range p.Comments {
 		res += `
 		<div class="isu-comment">
-		  <a href="/@` + p.User.AccountName + `" class="isu-comment-account-name">` + p.User.AccountName + `</a>
+		  <a href="/@` + c.User.AccountName + `" class="isu-comment-account-name">` + c.User.AccountName + `</a>
 		  <span class="isu-comment-text">` + c.Comment + `</span>
 		</div>
 		`

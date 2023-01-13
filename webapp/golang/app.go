@@ -184,7 +184,7 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 
 		query := "SELECT " +
 			" c.id as id, c.post_id as post_id, c.user_id as user_id, c.comment as comment, c.created_at as created_at" +
-			" u.id, u.account_name, u.passhash, u.authority, u.del_flg, u.created_at" +
+			" ,u.id, u.account_name, u.passhash, u.authority, u.del_flg, u.created_at" +
 			" FROM `comments` as c " +
 			" join users as u on u.id = c.user_id" +
 			" WHERE c.`post_id` = ? ORDER BY c.`created_at` DESC"

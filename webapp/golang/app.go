@@ -403,6 +403,15 @@ func getLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
+var index_layout = template.Must(template.New("layout.html").Funcs(template.FuncMap{
+	"imageURL": imageURL,
+}).ParseFiles(
+	getTemplPath("layout.html"),
+	getTemplPath("index.html"),
+	getTemplPath("posts.html"),
+	getTemplPath("post.html"),
+))
+
 func getIndex(w http.ResponseWriter, r *http.Request) {
 	me := getSessionUser(r)
 
@@ -419,27 +428,19 @@ func getIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	posts, err := makePosts(results, getCSRFToken(r), false)
+	csrf_token := getCSRFToken(r)
+	posts, err := makePosts(results, csrf_token, false)
 	if err != nil {
 		log.Print(err)
 		return
 	}
 
-	fmap := template.FuncMap{
-		"imageURL": imageURL,
-	}
-
-	template.Must(template.New("layout.html").Funcs(fmap).ParseFiles(
-		getTemplPath("layout.html"),
-		getTemplPath("index.html"),
-		getTemplPath("posts.html"),
-		getTemplPath("post.html"),
-	)).Execute(w, struct {
+	index_layout.Execute(w, struct {
 		Posts     []Post
 		Me        User
 		CSRFToken string
 		Flash     string
-	}{posts, me, getCSRFToken(r), getFlash(w, r, "notice")})
+	}{posts, me, csrf_token, getFlash(w, r, "notice")})
 }
 
 func getAccountName(w http.ResponseWriter, r *http.Request) {

@@ -7,7 +7,7 @@ ENV_FILE:=env
 # 問題によって変わる変数
 USER:=isucon
 BIN_NAME:=app
-BUILD_DIR:=/home/isucon/private-isu/webapp/golang
+BUILD_DIR:=/home/isucon/private_isu/webapp/golang
 SERVICE_NAME:=isu-go.service
 WORKDIR:=~/private_isu
 

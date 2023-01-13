@@ -60,7 +60,7 @@ discocat-slow-query:
 	echo "SERVER_ID: $(SERVER_ID)" >> $(DISCOCAT_TMPFILE)
 	echo "" >> $(DISCOCAT_TMPFILE)
 	@make slow-query >> $(DISCOCAT_TMPFILE)
-	cat $(DISCOCAT_TMPFILE) | head 500
+	cat $(DISCOCAT_TMPFILE) | head -n 500
 
 # alpでアクセスログを確認する
 .PHONY: alp

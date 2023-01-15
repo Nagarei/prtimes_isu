@@ -73,7 +73,7 @@ type Comment struct {
 
 var UserWithID = sync.Map{} // map[int]*User{}
 func getUserWithID(id int) User {
-	userraw, _ := UserWithID.Load(uid)
+	userraw, _ := UserWithID.Load(id)
 	user := userraw.(*User)
 	return User{
 		ID:          user.ID,

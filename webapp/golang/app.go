@@ -649,7 +649,7 @@ func getAccountName(w http.ResponseWriter, r *http.Request) {
 	// 	CommentedCount int
 	// 	Me             User
 	// }{posts, user, postCount, commentCount, commentedCount, me})
-	w.Write([]byte(layoutTemplate(me, strings.Join(userTemplate(posts, user, postCount, commentCount, commentedCount, ""), ""))))
+	w.Write([]byte(layoutTemplate(me, strings.Join(userTemplate(posts, user, postCount, commentCount, commentedCount), ""))))
 }
 
 var getPostsTemplate = template.Must(template.New("posts.html").Funcs(template.FuncMap{
@@ -702,7 +702,7 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	//getPostsTemplate.Execute(w, posts)
-	w.Write([]byte(strings.Join(postsTemplate(posts, ""), "")))
+	w.Write([]byte(strings.Join(postsTemplate(posts), "")))
 }
 
 var getPostsIDTemplate = template.Must(template.New("layout.html").Funcs(template.FuncMap{
@@ -748,7 +748,7 @@ func getPostsID(w http.ResponseWriter, r *http.Request) {
 
 	me := getSessionUser(r)
 
-	w.Write([]byte(layoutTemplate(me, strings.Join(postTemplate(p, ""), ""))))
+	w.Write([]byte(layoutTemplate(me, strings.Join(postTemplate(p), ""))))
 	// getPostsIDTemplate.Execute(w, struct {
 	// 	Post Post
 	// 	Me   User

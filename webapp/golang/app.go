@@ -494,7 +494,7 @@ func postRegister(w http.ResponseWriter, r *http.Request) {
 	var u User
 	db.Get(&u, "SELECT * FROM users WHERE `id` = ?", uid)
 	UserWithID.Store((int)(uid), &u)
-	session.Values["user_id"] = uid
+	session.Values["user_id"] = (int)(uid)
 	session.Values["csrf_token"] = secureRandomStr(16)
 	session.Save(r, w)
 

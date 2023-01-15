@@ -73,8 +73,15 @@ type Comment struct {
 
 var UserWithID = sync.Map{} // map[int]*User{}
 func getUserWithID(id int) User {
-	userraw, _ := UserWithID.Load(id)
-	user := userraw.(*User)
+	userraw, ok := UserWithID.Load(id)
+	if !ok {
+		return User{}
+	}
+	user, ok := userraw.(*User)
+	if !ok {
+		log.Fatal("userraw.(*User) error")
+		return User{}
+	}
 	return User{
 		ID:          user.ID,
 		AccountName: user.AccountName,
@@ -1048,6 +1055,7 @@ func main() {
 		log.Fatalf("Failed to connect to DB: %s.", err.Error())
 	}
 	defer db.Close()
+	initMemoryCache()
 
 	r := chi.NewRouter()
 

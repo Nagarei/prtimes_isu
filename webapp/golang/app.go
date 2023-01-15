@@ -1087,9 +1087,19 @@ func main() {
 	r.Get("/admin/banned", getAdminBanned)
 	r.Post("/admin/banned", postAdminBanned)
 	r.Get(`/@{accountName:[a-zA-Z]+}`, getAccountName)
-	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		http.FileServer(http.Dir("../public")).ServeHTTP(w, r)
-	})
+
+	staticServe := func(path string) func(w http.ResponseWriter, r *http.Request) {
+		dir := http.Dir("../public" + path)
+		return func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "public, max-age=7776000")
+			http.FileServer(dir).ServeHTTP(w, r)
+		}
+	}
+	r.Get("/css/style.css", staticServe("/css/style.css"))
+	r.Get("/img/ajax-loader.gif", staticServe("/img/ajax-loader.gif"))
+	r.Get("/js/main.js", staticServe("/js/main.js"))
+	r.Get("/js/timeago.min.js", staticServe("/js/timeago.min.js"))
+	r.Get("/favicon.ico", staticServe("/favicon.ico"))
 
 	log.Fatal(http.ListenAndServe(":80", r))
 }

@@ -14,6 +14,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "net/http/pprof"
@@ -43,7 +45,7 @@ type User struct {
 	AccountName string    `db:"account_name"`
 	Passhash    string    `db:"passhash"`
 	Authority   int       `db:"authority"`
-	DelFlg      int       `db:"del_flg"`
+	DelFlg      int32     `db:"del_flg"`
 	CreatedAt   time.Time `db:"created_at"`
 }
 
@@ -67,6 +69,60 @@ type Comment struct {
 	Comment   string    `db:"comment"`
 	CreatedAt time.Time `db:"created_at"`
 	User      User      `db:"u"`
+}
+
+var UserWithID = sync.Map{} // map[int]*User{}
+func getUserWithID(id int) User {
+	userraw, _ := UserWithID.Load(uid)
+	user := userraw.(*User)
+	return User{
+		ID:          user.ID,
+		AccountName: user.AccountName,
+		Passhash:    user.Passhash,
+		Authority:   user.Authority,
+		DelFlg:      atomic.LoadInt32(&user.DelFlg),
+		CreatedAt:   user.CreatedAt,
+	}
+}
+
+type CommentList struct {
+	arr   []Comment //昇順(limitは後ろから)
+	count int
+	mutex sync.RWMutex
+}
+
+var CommentWithPostID = sync.Map{} // map[int]*CommentList{}
+
+func initMemoryCache() {
+	userTmp := []User{}
+	err := db.Select(userTmp, "SELECT * FROM users")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	UserWithID = sync.Map{}
+	for i := range userTmp {
+		UserWithID.Store(userTmp[i].ID, &userTmp[i])
+	}
+
+	commentTmp := []Comment{}
+	err = db.Select(commentTmp, "SELECT * FROM comments ORDER BY post_id, created_at")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	CommentWithPostID = sync.Map{}
+	for _, c := range commentTmp {
+		del := getUserWithID(c.UserID).DelFlg
+		arrraw, _ := CommentWithPostID.LoadOrStore(c.PostID, &CommentList{arr: []Comment{}})
+		clist := arrraw.(*CommentList)
+		clist.mutex.Lock()
+		if del == 0 {
+			clist.arr = append(clist.arr, c)
+		}
+		clist.count += 1
+		clist.mutex.Unlock()
+	}
 }
 
 func init() {
@@ -117,6 +173,8 @@ func dbInitialize() {
 			WriteFile((int64)(p.ID), p.Mime, p.Imgdata)
 		}
 	}
+
+	initMemoryCache()
 }
 
 func tryLogin(accountName, password string) *User {
@@ -172,19 +230,23 @@ func getSession(r *http.Request) *sessions.Session {
 
 func getSessionUser(r *http.Request) User {
 	session := getSession(r)
-	uid, ok := session.Values["user_id"]
-	if !ok || uid == nil {
+	uidraw, ok := session.Values["user_id"]
+	if !ok || uidraw == nil {
+		return User{}
+	}
+	uid, ok := uidraw.(int)
+	if !ok {
 		return User{}
 	}
 
-	u := User{}
+	return getUserWithID(uid)
+	//u := User{}
+	// err := db.Get(&u, "SELECT * FROM `users` WHERE `id` = ?", uid)
+	// if err != nil {
+	// 	return User{}
+	// }
 
-	err := db.Get(&u, "SELECT * FROM `users` WHERE `id` = ?", uid)
-	if err != nil {
-		return User{}
-	}
-
-	return u
+	//return u
 }
 
 func getFlash(w http.ResponseWriter, r *http.Request, key string) string {
@@ -203,87 +265,64 @@ func getFlash(w http.ResponseWriter, r *http.Request, key string) string {
 func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, error) {
 	var posts []Post
 
-	var postIDs []int
 	for _, p := range results {
-		postIDs = append(postIDs, p.ID)
-	}
-
-	query_raw := "SELECT " +
-		" c.id as id, c.post_id as post_id, c.user_id as user_id, c.comment as comment, c.created_at as created_at" +
-		" ,u.id as 'u.id', u.account_name as 'u.account_name', u.passhash as 'u.passhash', u.authority as 'u.authority', u.del_flg as 'u.del_flg', u.created_at as 'u.created_at'" +
-		" FROM `comments` as c " +
-		" join users as u on u.id = c.user_id" +
-		" WHERE c.`post_id` IN (?) ORDER BY c.`post_id` DESC, c.`created_at` DESC"
-	if !allComments {
-		query_raw += " LIMIT " + strconv.Itoa(3*len(results))
-	}
-	query, params, err := sqlx.In(query_raw, postIDs)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var comments []Comment
-	err = db.Select(&comments, query, params...)
-	if err != nil {
-		return nil, err
-	}
-	comments_dict := map[int][]Comment{}
-	for _, c := range comments {
-		arr, ok := comments_dict[c.PostID]
-		if ok {
-			if len(arr) < 3 {
-				comments_dict[c.PostID] = append(arr, c)
-			}
-		} else {
-			comments_dict[c.PostID] = []Comment{c}
+		if p.User.ID == 0 {
+			p.User = getUserWithID(p.UserID)
 		}
-	}
+		if p.User.DelFlg != 0 {
+			continue
+		}
 
-	type CommentCount struct {
-		Count  int `db:"count"`
-		PostID int `db:"post_id"`
-	}
-	var comment_count_raw []CommentCount
-	query, params, err = sqlx.In("SELECT post_id, COUNT(*) AS `count` FROM `comments` WHERE `post_id` IN (?) GROUP BY `post_id`", postIDs)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = db.Select(&comment_count_raw, query, params...)
-	if err != nil {
-		return nil, err
-	}
-	comment_count_dict := map[int]int{}
-	for _, c := range comment_count_raw {
-		comment_count_dict[c.PostID] = c.Count
-	}
-
-	for _, p := range results {
-		// err = db.Get(&p.CommentCount, "SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?", p.ID)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		p.CommentCount = comment_count_dict[p.ID]
-
-		var comments []Comment = comments_dict[p.ID]
+		arrraw, _ := CommentWithPostID.LoadOrStore(p.ID, &CommentList{arr: []Comment{}})
+		clist := arrraw.(*CommentList)
+		clist.mutex.RLock()
+		p.CommentCount = clist.count
+		var comments []Comment
+		del := false
+		i := len(clist.arr) - 1
+		for ; i >= 0; i -= 1 {
+			c := clist.arr[i]
+			cu := getUserWithID(c.UserID)
+			if cu.DelFlg == 1 {
+				del = true
+				continue
+			}
+			c.User = cu
+			comments = append(comments, c)
+			if !allComments && len(comments) >= 3 {
+				break
+			}
+		}
+		clist.mutex.RUnlock()
+		if del {
+			go func() {
+				clist.mutex.Lock()
+				defer clist.mutex.Unlock()
+				i := 0
+				for j := 0; j < len(clist.arr); j += 1 {
+					c := clist.arr[j]
+					cu := getUserWithID(c.UserID)
+					if cu.DelFlg == 1 {
+						continue
+					}
+					if i != j {
+						clist.arr[i] = clist.arr[j]
+					}
+					i += 1
+				}
+				clist.arr = clist.arr[:i]
+			}()
+		}
 
 		// reverse
 		for i, j := 0, len(comments)-1; i < j; i, j = i+1, j-1 {
 			comments[i], comments[j] = comments[j], comments[i]
 		}
-
 		p.Comments = comments
-
-		if p.User.ID == 0 {
-			err = db.Get(&p.User, "SELECT * FROM `users` WHERE `id` = ?", p.UserID)
-			if err != nil {
-				return nil, err
-			}
-		}
 
 		p.CSRFToken = csrfToken
 
-		if p.User.DelFlg == 0 {
-			posts = append(posts, p)
-		}
+		posts = append(posts, p)
 		if len(posts) >= postsPerPage {
 			break
 		}
@@ -435,6 +474,9 @@ func postRegister(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 		return
 	}
+	var u User
+	db.Get(&u, "SELECT * FROM users WHERE `id` = ?", uid)
+	UserWithID.Store((int)(uid), &u)
 	session.Values["user_id"] = uid
 	session.Values["csrf_token"] = secureRandomStr(16)
 	session.Save(r, w)
@@ -867,11 +909,28 @@ func postComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := "INSERT INTO `comments` (`post_id`, `user_id`, `comment`) VALUES (?,?,?)"
-	_, err = db.Exec(query, postID, me.ID, r.FormValue("comment"))
+	result, err := db.Exec(query, postID, me.ID, r.FormValue("comment"))
 	if err != nil {
 		log.Print(err)
 		return
 	}
+	cid, err := result.LastInsertId()
+	var c Comment
+	err = db.Get(&c, "SELECT * FROM comments WHERE `id` = ?", cid)
+	func() {
+		arrraw, _ := CommentWithPostID.LoadOrStore(postID, &CommentList{arr: []Comment{}})
+		clist := arrraw.(*CommentList)
+		clist.mutex.Lock()
+		clist.arr = append(clist.arr, c)
+		for i := len(clist.arr) - 1; i >= 1; i -= 1 { //念のため挿入ソート
+			if clist.arr[i-1].CreatedAt.Before(clist.arr[i].CreatedAt) {
+				break
+			}
+			clist.arr[i-1], clist.arr[i] = clist.arr[i], clist.arr[i-1]
+		}
+		clist.count += 1
+		clist.mutex.Unlock()
+	}()
 
 	http.Redirect(w, r, fmt.Sprintf("/posts/%d", postID), http.StatusFound)
 }
@@ -932,6 +991,13 @@ func postAdminBanned(w http.ResponseWriter, r *http.Request) {
 
 	for _, id := range r.Form["uid[]"] {
 		db.Exec(query, 1, id)
+		v, err := strconv.Atoi(id)
+		if err != nil {
+			continue
+		}
+		userraw, _ := UserWithID.Load(v)
+		user := userraw.(*User)
+		atomic.StoreInt32(&user.DelFlg, 1)
 	}
 
 	http.Redirect(w, r, "/admin/banned", http.StatusFound)

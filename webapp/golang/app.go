@@ -101,6 +101,8 @@ type CommentList struct {
 var CommentWithPostID = sync.Map{} // map[int]*CommentList{}
 
 func initMemoryCache() {
+	log.Print("initMemoryCache")
+	log.Print("users...")
 	userTmp := []User{}
 	err := db.Select(&userTmp, "SELECT * FROM users")
 	if err != nil {
@@ -112,6 +114,7 @@ func initMemoryCache() {
 		UserWithID.Store(userTmp[i].ID, &userTmp[i])
 	}
 
+	log.Print("comments...")
 	commentTmp := []Comment{}
 	err = db.Select(&commentTmp, "SELECT * FROM comments ORDER BY post_id, created_at")
 	if err != nil {
@@ -122,7 +125,11 @@ func initMemoryCache() {
 	for _, c := range commentTmp {
 		del := getUserWithID(c.UserID).DelFlg
 		arrraw, _ := CommentWithPostID.LoadOrStore(c.PostID, &CommentList{arr: []Comment{}})
-		clist := arrraw.(*CommentList)
+		clist, ok := arrraw.(*CommentList)
+		if !ok {
+			log.Fatal("arrraw.(*CommentList) error")
+			return
+		}
 		clist.mutex.Lock()
 		if del == 0 {
 			clist.arr = append(clist.arr, c)
@@ -130,6 +137,7 @@ func initMemoryCache() {
 		clist.count += 1
 		clist.mutex.Unlock()
 	}
+	log.Print("done")
 }
 
 func init() {

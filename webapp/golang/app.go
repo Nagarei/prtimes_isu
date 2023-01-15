@@ -71,7 +71,7 @@ type Comment struct {
 	User      User      `db:"u"`
 }
 
-var UserWithID = sync.Map{} // map[int]*User{}
+var UserWithID = &sync.Map{} // map[int]*User{}
 func getUserWithID(id int) User {
 	userraw, ok := UserWithID.Load(id)
 	if !ok {
@@ -98,7 +98,7 @@ type CommentList struct {
 	mutex sync.RWMutex
 }
 
-var CommentWithPostID = sync.Map{} // map[int]*CommentList{}
+var CommentWithPostID = &sync.Map{} // map[int]*CommentList{}
 
 func initMemoryCache() {
 	log.Print("initMemoryCache")
@@ -109,7 +109,7 @@ func initMemoryCache() {
 		log.Fatal(err)
 		return
 	}
-	UserWithID = sync.Map{}
+	UserWithID = &sync.Map{}
 	for i := range userTmp {
 		UserWithID.Store(userTmp[i].ID, &userTmp[i])
 	}
@@ -121,7 +121,7 @@ func initMemoryCache() {
 		log.Fatal(err)
 		return
 	}
-	CommentWithPostID = sync.Map{}
+	CommentWithPostID = &sync.Map{}
 	for _, c := range commentTmp {
 		del := getUserWithID(c.UserID).DelFlg
 		arrraw, _ := CommentWithPostID.LoadOrStore(c.PostID, &CommentList{arr: []Comment{}})

@@ -1063,7 +1063,10 @@ func main() {
 		log.Fatalf("Failed to connect to DB: %s.", err.Error())
 	}
 	defer db.Close()
-	initMemoryCache()
+	go func() {
+		time.Sleep(3 * time.Second)
+		initMemoryCache()
+	}()
 
 	r := chi.NewRouter()
 

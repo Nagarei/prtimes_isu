@@ -95,7 +95,7 @@ var CommentWithPostID = sync.Map{} // map[int]*CommentList{}
 
 func initMemoryCache() {
 	userTmp := []User{}
-	err := db.Select(userTmp, "SELECT * FROM users")
+	err := db.Select(&userTmp, "SELECT * FROM users")
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -106,7 +106,7 @@ func initMemoryCache() {
 	}
 
 	commentTmp := []Comment{}
-	err = db.Select(commentTmp, "SELECT * FROM comments ORDER BY post_id, created_at")
+	err = db.Select(&commentTmp, "SELECT * FROM comments ORDER BY post_id, created_at")
 	if err != nil {
 		log.Fatal(err)
 		return

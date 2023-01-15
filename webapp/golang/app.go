@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/md5"
 	crand "crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"html/template"
 	"io"
@@ -1088,25 +1090,46 @@ func main() {
 	r.Post("/admin/banned", postAdminBanned)
 	r.Get(`/@{accountName:[a-zA-Z]+}`, getAccountName)
 
-	staticServe := func(path string) func(w http.ResponseWriter, r *http.Request) {
+	staticServe := func(path string, mime string) func(w http.ResponseWriter, r *http.Request) {
+		hash := md5.New()
+		defer hash.Reset()
+		hash.Write([]byte(password))
+		etag := "W/\"" + hex.EncodeToString(hash.Sum(nil)) + "\""
 		return func(w http.ResponseWriter, r *http.Request) {
-			f, err := os.Open("../public" + path)
-			if err != nil {
-				http.Error(w, "file not found", 404)
+			if r.Header.Get("if-none-match") == etag {
+				w.WriteHeader(http.StatusNotModified)
+				return
 			}
-			defer f.Close()
-			fi, err := f.Stat() // ファイルの各情報をファイル構造体から取得する
+			imgfile, err := os.Open("../public" + path)
 			if err != nil {
-				http.Error(w, "file not found", 404)
+				w.WriteHeader(http.StatusNotFound)
+				return
 			}
-			http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
+			w.Header().Set("Content-Type", mime)
+			w.Header().Set("Cache-Control", "max-age=604800, immutable")
+			w.Header().Set("etag", etag)
+			_, err = io.Copy(w, imgfile)
+			if err != nil {
+				log.Print(err)
+				return
+			}
+			// f, err := os.Open("../public" + path)
+			// if err != nil {
+			// 	http.Error(w, "file not found", 404)
+			// }
+			// defer f.Close()
+			// fi, err := f.Stat() // ファイルの各情報をファイル構造体から取得する
+			// if err != nil {
+			// 	http.Error(w, "file not found", 404)
+			// }
+			// http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
 		}
 	}
-	r.Get("/css/style.css", staticServe("/css/style.css"))
-	r.Get("/img/ajax-loader.gif", staticServe("/img/ajax-loader.gif"))
-	r.Get("/js/main.js", staticServe("/js/main.js"))
-	r.Get("/js/timeago.min.js", staticServe("/js/timeago.min.js"))
-	r.Get("/favicon.ico", staticServe("/favicon.ico"))
+	r.Get("/css/style.css", staticServe("/css/style.css", "text/css; charset=utf-8"))
+	r.Get("/img/ajax-loader.gif", staticServe("/img/ajax-loader.gif", "image/gif"))
+	r.Get("/js/main.js", staticServe("/js/main.js", "text/javascript; charset=utf-8"))
+	r.Get("/js/timeago.min.js", staticServe("/js/timeago.min.js", "text/javascript; charset=utf-8"))
+	r.Get("/favicon.ico", staticServe("/favicon.ico", "image/vnd.microsoft.icon"))
 
 	log.Fatal(http.ListenAndServe(":80", r))
 }

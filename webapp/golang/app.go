@@ -251,6 +251,8 @@ func getSessionUser(r *http.Request) User {
 	}
 	uid, ok := uidraw.(int)
 	if !ok {
+		log.Print("uid is not int")
+		log.Print(uid)
 		return User{}
 	}
 

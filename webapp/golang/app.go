@@ -701,7 +701,7 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	//getPostsTemplate.Execute(w, posts)
-	w.Write([]byte(postsTemplate(posts, "")))
+	w.Write([]byte(strings.Join(postsTemplate(posts, ""), "")))
 }
 
 var getPostsIDTemplate = template.Must(template.New("layout.html").Funcs(template.FuncMap{
@@ -747,7 +747,7 @@ func getPostsID(w http.ResponseWriter, r *http.Request) {
 
 	me := getSessionUser(r)
 
-	w.Write([]byte(layoutTemplate(me, postTemplate(p, ""))))
+	w.Write([]byte(layoutTemplate(me, strings.Join(postTemplate(p, ""), ""))))
 	// getPostsIDTemplate.Execute(w, struct {
 	// 	Post Post
 	// 	Me   User
@@ -1135,8 +1135,8 @@ func main() {
 }
 
 func layoutTemplate(Me User, content string) string {
-	res := ""
-	res += `<!DOCTYPE html>
+	res := make([]string, 0, 10)
+	res = append(res, `<!DOCTYPE html>
 	<html>
 	  <head>
 		<meta charset="utf-8">
@@ -1149,34 +1149,32 @@ func layoutTemplate(Me User, content string) string {
 			<div class="isu-title">
 			  <h1><a href="/">Iscogram</a></h1>
 			</div>
-			<div class="isu-header-menu">`
+			<div class="isu-header-menu">`)
 	if Me.ID == 0 {
-		res += `<div><a href="/login">ログイン</a></div>`
+		res = append(res, `<div><a href="/login">ログイン</a></div>`)
 	} else {
-		res += `<div><a href="/@` + Me.AccountName + `"><span class="isu-account-name">` + Me.AccountName + `</span>さん</a></div>`
+		res = append(res, `<div><a href="/@`, Me.AccountName, `"><span class="isu-account-name">`, Me.AccountName, `</span>さん</a></div>`)
 		if Me.Authority == 1 {
-			res += `<div><a href="/admin/banned">管理者用ページ</a></div>`
+			res = append(res, `<div><a href="/admin/banned">管理者用ページ</a></div>`)
 		}
-		res += `<div><a href="/logout">ログアウト</a></div>`
+		res = append(res, `<div><a href="/logout">ログアウト</a></div>`)
 	}
-	res += `
+	res = append(res, `
 			</div>
-		  </div>`
-	res += content
-	res += `
+		  </div>`, content, `
 		</div>
 		<script src="/js/timeago.min.js"></script>
 		<script src="/js/main.js"></script>
 	  </body>
-	</html>`
-	return res
+	</html>`)
+	return strings.Join(res, "")
 }
 func indexTemplate(
 	Posts []Post,
 	CSRFToken string,
 	Flash string) string {
-	res := ""
-	res += `
+	res := make([]string, 0, 100)
+	res = append(res, `
 	<div class="isu-submit">
 	  <form method="post" action="/" enctype="multipart/form-data">
 		<div class="isu-form">
@@ -1186,73 +1184,72 @@ func indexTemplate(
 		  <textarea name="body"></textarea>
 		</div>
 		<div class="form-submit">
-		  <input type="hidden" name="csrf_token" value="` + CSRFToken + `">
+		  <input type="hidden" name="csrf_token" value="`, CSRFToken, `">
 		  <input type="submit" name="submit" value="submit">
-		</div>`
+		</div>`)
 	if Flash != "" {
-		res += `<div id="notice-message" class="alert alert-danger">` +
-			Flash +
-			`</div>`
+		res = append(res, `<div id="notice-message" class="alert alert-danger">`,
+			Flash,
+			`</div>`)
 	}
-	res += `</form>
-	</div>`
-
-	res += postsTemplate(Posts, CSRFToken)
-	res += `<div id="isu-post-more">
+	res = append(res, `</form>
+	</div>`)
+	res = append(res, postsTemplate(Posts, CSRFToken)...)
+	res = append(res, `<div id="isu-post-more">
 	  <button id="isu-post-more-btn">もっと見る</button>
 	  <img class="isu-loading-icon" src="/img/ajax-loader.gif">
-	</div>`
-	return res
+	</div>`)
+	return strings.Join(res, "")
 }
-func postsTemplate(ps []Post, CSRFToken string) string {
-	res := ""
+func postsTemplate(ps []Post, CSRFToken string) []string {
+	res := make([]string, 0, 100)
 	for _, p := range ps {
-		res += `<div class="isu-posts">` + postTemplate(p, CSRFToken) +
-			`</div>`
-
+		res = append(res, `<div class="isu-posts">`)
+		res = append(res, postTemplate(p, CSRFToken)...)
+		res = append(res, `</div>`)
 	}
 	return res
 }
-func postTemplate(p Post, CSRFToken string) string {
-	res := ""
-	res += `<div class="isu-post" id="pid_` + strconv.Itoa(p.ID) + `" data-created-at="` + p.CreatedAt.Format("2006-01-02T15:04:05-07:00") + `">
+func postTemplate(p Post, CSRFToken string) []string {
+	res := make([]string, 0, 100)
+	res = append(res, `<div class="isu-post" id="pid_`, strconv.Itoa(p.ID), `" data-created-at="`, p.CreatedAt.Format("2006-01-02T15:04:05-07:00"), `">
   <div class="isu-post-header">
-    <a href="/@` + p.User.AccountName + ` " class="isu-post-account-name">` + p.User.AccountName + `</a>
-    <a href="/posts/` + strconv.Itoa(p.ID) + `" class="isu-post-permalink">
-      <time class="timeago" datetime="` + p.CreatedAt.Format("2006-01-02T15:04:05-07:00") + `"></time>
+    <a href="/@`, p.User.AccountName, ` " class="isu-post-account-name">`, p.User.AccountName, `</a>
+    <a href="/posts/`, strconv.Itoa(p.ID), `" class="isu-post-permalink">
+      <time class="timeago" datetime="`, p.CreatedAt.Format("2006-01-02T15:04:05-07:00"), `"></time>
     </a>
   </div>
   <div class="isu-post-image">
-    <img src="` + imageURL(p) + `" class="isu-image">
+    <img src="`, imageURL(p), `" class="isu-image">
   </div>
   <div class="isu-post-text">
-    <a href="/@` + p.User.AccountName + `" class="isu-post-account-name">` + p.User.AccountName + `</a>
-    ` + p.Body + `
+    <a href="/@`, p.User.AccountName, `" class="isu-post-account-name">`, p.User.AccountName, `</a>
+    `, p.Body, `
   </div>
   <div class="isu-post-comment">
     <div class="isu-post-comment-count">
-      comments: <b>` + strconv.Itoa(p.CommentCount) + `</b>
+      comments: <b>`, strconv.Itoa(p.CommentCount), `</b>
     </div>
-`
+`)
 	for _, c := range p.Comments {
-		res += `
+		res = append(res, `
 		<div class="isu-comment">
-		  <a href="/@` + c.User.AccountName + `" class="isu-comment-account-name">` + c.User.AccountName + `</a>
-		  <span class="isu-comment-text">` + c.Comment + `</span>
+		  <a href="/@`, c.User.AccountName, `" class="isu-comment-account-name">`, c.User.AccountName, `</a>
+		  <span class="isu-comment-text">`, c.Comment, `</span>
 		</div>
-		`
+		`)
 	}
-	res += `
+	res = append(res, `
     <div class="isu-comment-form">
       <form method="post" action="/comment">
         <input type="text" name="comment">
-        <input type="hidden" name="post_id" value="` + strconv.Itoa(p.ID) + `">
-        <input type="hidden" name="csrf_token" value="` + CSRFToken + `">
+        <input type="hidden" name="post_id" value="`, strconv.Itoa(p.ID), `">
+        <input type="hidden" name="csrf_token" value="`, CSRFToken, `">
         <input type="submit" name="submit" value="submit">
       </form>
     </div>
   </div>
-</div>`
+</div>`)
 
 	return res
 }

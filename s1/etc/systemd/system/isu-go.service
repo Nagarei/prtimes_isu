@@ -12,6 +12,7 @@ User=root
 Group=root
 ExecStart=/home/isucon/private_isu/webapp/golang/app -bind "127.0.0.1:8080"
 ExecStop=/bin/kill -s QUIT $MAINPID
+Restart   = always
 
 [Install]
 WantedBy=multi-user.target

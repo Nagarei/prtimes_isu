@@ -937,6 +937,10 @@ func postComment(w http.ResponseWriter, r *http.Request) {
 	cid, err := result.LastInsertId()
 	var c Comment
 	err = db.Get(&c, "SELECT * FROM comments WHERE `id` = ?", cid)
+	if err != nil {
+		log.Print(err)
+		return
+	}
 	func() {
 		arrraw, _ := CommentWithPostID.LoadOrStore(postID, &CommentList{arr: []Comment{}})
 		clist, ok := arrraw.(*CommentList)

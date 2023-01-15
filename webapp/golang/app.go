@@ -1199,7 +1199,7 @@ func indexTemplate(
 	}
 	res = append(res, `</form>
 	</div>`)
-	res = append(res, postsTemplate(Posts, CSRFToken)...)
+	res = append(res, postsTemplate(Posts)...)
 	res = append(res, `<div id="isu-post-more">
 	  <button id="isu-post-more-btn">もっと見る</button>
 	  <img class="isu-loading-icon" src="/img/ajax-loader.gif">
@@ -1210,7 +1210,7 @@ func userTemplate(ps []Post,
 	User User,
 	PostCount int,
 	CommentCount int,
-	CommentedCount int, CSRFToken string) []string {
+	CommentedCount int) []string {
 	res := make([]string, 0, 100)
 	res = append(res, `<div class="isu-user">
   <div><span class="isu-user-account-name">`, User.AccountName, `さん</span>のページ</div>
@@ -1218,19 +1218,19 @@ func userTemplate(ps []Post,
   <div>コメント数 <span class="isu-comment-count">`, strconv.Itoa(CommentCount), `</span></div>
   <div>被コメント数 <span class="isu-commented-count">`, strconv.Itoa(CommentedCount), `</span></div>
 </div>`)
-	res = append(res, postsTemplate(ps, CSRFToken)...)
+	res = append(res, postsTemplate(ps)...)
 	return res
 }
-func postsTemplate(ps []Post, CSRFToken string) []string {
+func postsTemplate(ps []Post) []string {
 	res := make([]string, 0, 100)
 	for _, p := range ps {
 		res = append(res, `<div class="isu-posts">`)
-		res = append(res, postTemplate(p, CSRFToken)...)
+		res = append(res, postTemplate(p)...)
 		res = append(res, `</div>`)
 	}
 	return res
 }
-func postTemplate(p Post, CSRFToken string) []string {
+func postTemplate(p Post) []string {
 	res := make([]string, 0, 100)
 	res = append(res, `<div class="isu-post" id="pid_`, strconv.Itoa(p.ID), `" data-created-at="`, p.CreatedAt.Format("2006-01-02T15:04:05-07:00"), `">
   <div class="isu-post-header">
@@ -1264,7 +1264,7 @@ func postTemplate(p Post, CSRFToken string) []string {
       <form method="post" action="/comment">
         <input type="text" name="comment">
         <input type="hidden" name="post_id" value="`, strconv.Itoa(p.ID), `">
-        <input type="hidden" name="csrf_token" value="`, CSRFToken, `">
+        <input type="hidden" name="csrf_token" value="`, p.CSRFToken, `">
         <input type="submit" name="submit" value="submit">
       </form>
     </div>

@@ -919,8 +919,13 @@ func postComment(w http.ResponseWriter, r *http.Request) {
 	err = db.Get(&c, "SELECT * FROM comments WHERE `id` = ?", cid)
 	func() {
 		arrraw, _ := CommentWithPostID.LoadOrStore(postID, &CommentList{arr: []Comment{}})
-		clist := arrraw.(*CommentList)
+		clist, ok := arrraw.(*CommentList)
+		if !ok {
+			log.Print(err)
+			return
+		}
 		clist.mutex.Lock()
+		defer clist.mutex.Unlock()
 		clist.arr = append(clist.arr, c)
 		for i := len(clist.arr) - 1; i >= 1; i -= 1 { //念のため挿入ソート
 			if clist.arr[i-1].CreatedAt.Before(clist.arr[i].CreatedAt) {
@@ -929,7 +934,6 @@ func postComment(w http.ResponseWriter, r *http.Request) {
 			clist.arr[i-1], clist.arr[i] = clist.arr[i], clist.arr[i-1]
 		}
 		clist.count += 1
-		clist.mutex.Unlock()
 	}()
 
 	http.Redirect(w, r, fmt.Sprintf("/posts/%d", postID), http.StatusFound)

@@ -1089,10 +1089,17 @@ func main() {
 	r.Get(`/@{accountName:[a-zA-Z]+}`, getAccountName)
 
 	staticServe := func(path string) func(w http.ResponseWriter, r *http.Request) {
-		dir := http.Dir("../public" + path)
 		return func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Cache-Control", "public, max-age=7776000")
-			http.FileServer(dir).ServeHTTP(w, r)
+			f, err := os.Open("../public" + path)
+			if err != nil {
+				http.Error(w, "file not found", 404)
+			}
+			defer f.Close()
+			fi, err := f.Stat() // ファイルの各情報をファイル構造体から取得する
+			if err != nil {
+				http.Error(w, "file not found", 404)
+			}
+			http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
 		}
 	}
 	r.Get("/css/style.css", staticServe("/css/style.css"))

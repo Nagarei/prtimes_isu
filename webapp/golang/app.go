@@ -632,23 +632,24 @@ func getAccountName(w http.ResponseWriter, r *http.Request) {
 
 	me := getSessionUser(r)
 
-	fmap := template.FuncMap{
-		"imageURL": imageURL,
-	}
-
-	template.Must(template.New("layout.html").Funcs(fmap).ParseFiles(
-		getTemplPath("layout.html"),
-		getTemplPath("user.html"),
-		getTemplPath("posts.html"),
-		getTemplPath("post.html"),
-	)).Execute(w, struct {
-		Posts          []Post
-		User           User
-		PostCount      int
-		CommentCount   int
-		CommentedCount int
-		Me             User
-	}{posts, user, postCount, commentCount, commentedCount, me})
+	// fmap := template.FuncMap{
+	// 	"imageURL": imageURL,
+	// }
+	//
+	// template.Must(template.New("layout.html").Funcs(fmap).ParseFiles(
+	// 	getTemplPath("layout.html"),
+	// 	getTemplPath("user.html"),
+	// 	getTemplPath("posts.html"),
+	// 	getTemplPath("post.html"),
+	// )).Execute(w, struct {
+	// 	Posts          []Post
+	// 	User           User
+	// 	PostCount      int
+	// 	CommentCount   int
+	// 	CommentedCount int
+	// 	Me             User
+	// }{posts, user, postCount, commentCount, commentedCount, me})
+	w.Write([]byte(layoutTemplate(me, strings.Join(userTemplate(posts, user, postCount, commentCount, commentedCount, ""), ""))))
 }
 
 var getPostsTemplate = template.Must(template.New("posts.html").Funcs(template.FuncMap{
@@ -1200,6 +1201,21 @@ func indexTemplate(
 	  <img class="isu-loading-icon" src="/img/ajax-loader.gif">
 	</div>`)
 	return strings.Join(res, "")
+}
+func userTemplate(ps []Post,
+	User User,
+	PostCount int,
+	CommentCount int,
+	CommentedCount int, CSRFToken string) []string {
+	res := make([]string, 0, 100)
+	res = append(res, `<div class="isu-user">
+  <div><span class="isu-user-account-name">`, User.AccountName, `さん</span>のページ</div>
+  <div>投稿数 <span class="isu-post-count">`, strconv.Itoa(PostCount), `</span></div>
+  <div>コメント数 <span class="isu-comment-count">`, strconv.Itoa(CommentCount), `</span></div>
+  <div>被コメント数 <span class="isu-commented-count">`, strconv.Itoa(CommentedCount), `</span></div>
+</div>`)
+	res = append(res, postsTemplate(ps, CSRFToken)...)
+	return res
 }
 func postsTemplate(ps []Post, CSRFToken string) []string {
 	res := make([]string, 0, 100)
